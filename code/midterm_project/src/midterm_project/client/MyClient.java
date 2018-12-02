@@ -1,11 +1,8 @@
 package midterm_project.client;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
-import java.net.SocketException;
 import midterm_project.datagram.Format;
 
 import midterm_project.datagram.Datagram;
@@ -15,6 +12,8 @@ public class MyClient {
 	private String destinationIp;
 	private int destinationPort;
 	private DatagramSocket client;
+	private int x = 0;
+	private int y;
 	
 	public MyClient(int sourcePort, String destinationIp, int destinationPort) {
 		this.sourcePort = sourcePort;
@@ -29,28 +28,37 @@ public class MyClient {
 			
 			//	发送第一次握手
 			Datagram firstConnect = new Datagram();
-			firstConnect.setACK(0);
 			firstConnect.setSYN(1);
+			firstConnect.setSeq(x);
 			byte[] requstData = Format.datagramToByteArray(firstConnect);
 			DatagramPacket requstPacket = new DatagramPacket(requstData, requstData.length, new InetSocketAddress(destinationIp, destinationPort));
 			client.send(requstPacket);
+			x++;
 			
 			
 			//	接收第二次握手
 			byte[] resposeData = new byte[1024];
 			DatagramPacket resposePacket = new DatagramPacket(resposeData, resposeData.length);
 			client.receive(resposePacket);
-			String resposeString = new String(resposeData, 0, resposePacket.getLength());
-			System.out.println(resposeString);
+			Datagram secondConnect = Format.byteArrayToDatagram(resposeData);
+			
+			if (secondConnect.getSYN() != 1 || secondConnect.getACK() != 1) {
+				client.close();
+			}
+			y = secondConnect.getSeq();
+			
 			
 			//	发送第三次握手
+			Datagram thirdConnect = new Datagram();
+			thirdConnect.setACK(1);
+			thirdConnect.setSeq(x);
+			thirdConnect.setAck(y + 1);
+			requstData = Format.datagramToByteArray(thirdConnect);
+			requstPacket = new DatagramPacket(requstData, requstData.length, new InetSocketAddress(destinationIp, destinationPort));
+			client.send(requstPacket);
+			x++;
 			
-			
-			
-			client.close();
-		} catch (SocketException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
