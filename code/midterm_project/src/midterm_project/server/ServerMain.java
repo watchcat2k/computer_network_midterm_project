@@ -2,7 +2,8 @@ package midterm_project.server;
 
 public class ServerMain {
 	public static void main(String[] args) {
-		MyServer myServer = new MyServer();
-		
+		int port = 8080;
+		MyServer server = new MyServer(port);
+		server.connect();
 	}
 }
