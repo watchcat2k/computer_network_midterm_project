@@ -1,15 +1,19 @@
 package midterm_project.client;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import midterm_project.datagram.Format;
+
+import midterm_project.datagram.Datagram;
 
 public class MyClient {
-	static private int sourcePort;
-	static private String destinationIp;
-	static private int destinationPort;
+	private int sourcePort;
+	private String destinationIp;
+	private int destinationPort;
 	private DatagramSocket client;
 	
 	public MyClient(int sourcePort, String destinationIp, int destinationPort) {
@@ -18,16 +22,19 @@ public class MyClient {
 		this.destinationPort = destinationPort;
 	}
 	
+	//	三次握手
 	public void connect() {
 		try {
 			client = new DatagramSocket(sourcePort);
 			
 			//	发送第一次握手
-			String mString = "HelloWorld";
-			byte[] requstData = mString.getBytes();
-			
+			Datagram firstConnect = new Datagram();
+			firstConnect.setACK(0);
+			firstConnect.setSYN(1);
+			byte[] requstData = Format.datagramToByteArray(firstConnect);
 			DatagramPacket requstPacket = new DatagramPacket(requstData, requstData.length, new InetSocketAddress(destinationIp, destinationPort));
 			client.send(requstPacket);
+			
 			
 			//	接收第二次握手
 			byte[] resposeData = new byte[1024];
@@ -39,6 +46,7 @@ public class MyClient {
 			//	发送第三次握手
 			
 			
+			
 			client.close();
 		} catch (SocketException e) {
 			e.printStackTrace();
@@ -47,6 +55,7 @@ public class MyClient {
 		}
 	}
 	
+	//	四次挥手
 	public void disconnect() {
 		
 		
