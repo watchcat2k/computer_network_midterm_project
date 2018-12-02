@@ -7,63 +7,44 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
 public class Format {
-	//	Datagram转二进制数组
-	public static Datagram byteArrayToDatagram(byte[] b) {
-		ByteArrayInputStream bis = null;
-	    ObjectInputStream ois = null;
-	    try {
-	        bis = new ByteArrayInputStream(b);
-	        ois = new ObjectInputStream(bis);
-	        return (Datagram)ois.readObject();
-	    } catch (ClassNotFoundException | IOException e) {
-	    	e.printStackTrace();
-	    } finally {
-	        if(ois != null) {
-	            try {
-	                ois.close();
-	            } catch (IOException e) {
-	                e.printStackTrace();
-	            }
-	        }
-	        if(bis != null) {
-	            try {
-	                bis.close();
-	            } catch (IOException e) {
-	                e.printStackTrace();
-	            }
-	        }
-	    }
-	    return null;
+	//	二进制数组转Datagram
+	public static Datagram byteArrayToDatagram(byte[] bytes) {
+		ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+        ObjectInputStream ois = null;
+        try {
+            ois = new ObjectInputStream(bais);
+            Object object = ois.readObject();
+            return (Datagram)object;
+        } catch (IOException ex) {
+            throw new RuntimeException(ex.getMessage(), ex);
+        } catch (ClassNotFoundException ex) {
+            throw new RuntimeException(ex.getMessage(), ex);
+        } finally {
+            try {
+                ois.close();
+            } catch (Exception e) {
+            }
+        }
 	}
 	
-	//	二进制数组转Datagram
+	//	Datagram转二进制数组
 	public static byte[] datagramToByteArray(Datagram obj) {
-	    ByteArrayOutputStream bos = null;
-	    ObjectOutputStream oos = null;
-	    try {
-	        bos = new ByteArrayOutputStream();
-	        oos = new ObjectOutputStream(bos);
-	        //读取对象并转换成二进制数据
-	        oos.writeObject(obj);
-	        return bos.toByteArray();
-	    } catch (IOException e) {
-	    	e.printStackTrace();
-	    } finally {
-	        if(oos != null) {
-	            try {
-	                oos.close();
-	            } catch (IOException e) {
-	                e.printStackTrace();
-	            }
-	        }
-	        if(bos != null) {
-	            try {
-	                bos.close();
-	            } catch (IOException e) {
-	                e.printStackTrace();
-	            }
-	        }
-	    }
-	    return null;
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = null;
+        try {
+            oos = new ObjectOutputStream(baos);
+            oos.writeObject(obj);
+            byte[] bytes = baos.toByteArray();
+            return bytes;
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        } finally {
+            try {
+                oos.close();
+            } catch (Exception e) {
+            	e.printStackTrace();
+            }
+        }
+        return null;
 	}
 }
