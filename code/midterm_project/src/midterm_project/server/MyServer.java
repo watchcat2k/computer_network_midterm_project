@@ -1,4 +1,4 @@
-package midterm_project;
+package midterm_project.server;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -7,7 +7,8 @@ import java.net.InetAddress;
 import java.net.SocketException;
 
 public class MyServer {
-	public static void main(String[] args) {
+	public MyServer() {
+		
 		DatagramSocket server = null;
 	
 		try {
@@ -41,10 +42,8 @@ public class MyServer {
 			//释放
 			//server.close();
 		} catch (SocketException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
