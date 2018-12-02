@@ -55,6 +55,7 @@ public class MyServer {
 			secondDatagram.setAck(x + 1);
 			byte[] resposeData1 = midterm_project.datagram.Format.datagramToByteArray(secondDatagram);
 			DatagramPacket resposePacket = new DatagramPacket(resposeData1, resposeData1.length, clientAddress, clientPort);
+			server.send(resposePacket);
 			
 			//接受第三个
 			server.receive(requstPacket);

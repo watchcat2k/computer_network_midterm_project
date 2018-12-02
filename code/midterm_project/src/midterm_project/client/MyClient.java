@@ -35,18 +35,15 @@ public class MyClient {
 			client.send(requstPacket);
 			x++;
 			
-			
 			//	接收第二次握手
 			byte[] resposeData = new byte[1024];
 			DatagramPacket resposePacket = new DatagramPacket(resposeData, resposeData.length);
 			client.receive(resposePacket);
 			Datagram secondConnect = Format.byteArrayToDatagram(resposeData);
 			
-			if (secondConnect.getSYN() != 1 || secondConnect.getACK() != 1) {
-				client.close();
+			if (secondConnect.getSYN() == 1 && secondConnect.getACK() == 1) {
+				y = secondConnect.getSeq();
 			}
-			y = secondConnect.getSeq();
-			
 			
 			//	发送第三次握手
 			Datagram thirdConnect = new Datagram();
@@ -57,7 +54,6 @@ public class MyClient {
 			requstPacket = new DatagramPacket(requstData, requstData.length, new InetSocketAddress(destinationIp, destinationPort));
 			client.send(requstPacket);
 			x++;
-			
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

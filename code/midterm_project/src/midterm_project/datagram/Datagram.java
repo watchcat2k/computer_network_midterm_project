@@ -1,6 +1,8 @@
 package midterm_project.datagram;
 
-public class Datagram {
+import java.io.Serializable;
+
+public class Datagram implements Serializable {
 	private int SYN;
 	private int ACK;
 	private int FIN;
