@@ -4,9 +4,15 @@ public class Datagram {
 	private int SYN;
 	private int ACK;
 	private int FIN;
+	private int seq;
+	private int ack;
 	
 	public Datagram() {
-		
+		SYN = 0;
+		ACK = 0;
+		FIN = 0;
+		seq = 0;
+		ack = 0;
 	}
 	
 	public int getSYN() {
@@ -31,5 +37,21 @@ public class Datagram {
 	
 	public void setFIN(int FIN) {
 		this.FIN = FIN;
+	}
+	
+	public int getSeq() {
+		return seq;
+	}
+	
+	public void setSeq(int seq) {
+		this.seq = seq;
+	}
+	
+	public int getAck() {
+		return ack;
+	}
+	
+	public void setAck(int ack) {
+		this.ack = ack;
 	}
 }
