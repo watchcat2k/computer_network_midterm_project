@@ -194,13 +194,13 @@ public class MyClient {
 				if (rFile.read(buf) == -1) {
 					break;
 				}
-				fileReadNum++;
 				datagram.setPort(fileTranPort);
 				datagram.setBuf(buf);
-				datagram.setSeq(fileReadNum + i);
+				datagram.setSeq(fileReadNum);
 				mapLock.lock();
-				map.put(fileReadNum + i, datagram);
+				map.put(fileReadNum, datagram);
 				mapLock.unlock();
+				fileReadNum++;
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
