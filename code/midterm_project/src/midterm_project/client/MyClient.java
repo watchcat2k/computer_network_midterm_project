@@ -13,6 +13,7 @@ public class MyClient {
 	private DatagramSocket client;
 	private int x = 0;
 	private int y;
+	private int fileTranPort;
 	
 	public MyClient(int sourcePort, String destinationIp, int destinationPort) {
 		this.sourcePort = sourcePort;
@@ -36,6 +37,7 @@ public class MyClient {
 		if (response.getACK() == 1) {
 			x++;
 			y = response.getSeq();
+			fileTranPort = response.getPort();
 		}
 		
 		sendFile();
@@ -51,6 +53,7 @@ public class MyClient {
 		if (response.getACK() == 1) {
 			x++;
 			y = response.getSeq();
+			fileTranPort = response.getPort();
 		}
 		
 		receiveFile();

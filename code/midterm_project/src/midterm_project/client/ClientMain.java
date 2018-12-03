@@ -17,10 +17,10 @@ public class ClientMain {
 		
 		
 		if (inputArray[1].equals("lget")) {			//	ÏÂÔØ
-			myClient.Download(inputArray[2]);
+			myClient.Download(fileName);
 		}
 		else if (inputArray[1].equals("lsend")) {	//	ÉÏ´«
-			myClient.Upload(inputArray[2]);
+			myClient.Upload(fileName);
 		}
 	}
 }
