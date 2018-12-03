@@ -8,18 +8,17 @@ public class ClientMain {
 	public static void main(String[] args) {
 		MyClient myClient = new MyClient(8888, "localhost", 8080);
 		
-		System.out.println("请输入要上传或下载的文件");
+		System.out.println("璇疯緭鍏ヨ涓婁紶鎴栦笅杞界殑鏂囦欢");
 		Scanner input = new Scanner(System.in);
 		String inputStr = input.nextLine();
 		
 		String[] inputArray = inputStr.split("\\s+");
 		String fileName = inputArray[2];
 		
-		
-		if (inputArray[1].equals("lget")) {			//	下载
+		if (inputArray[1].equals("lget")) {			//	锟斤拷锟斤拷
 			myClient.Download(fileName);
 		}
-		else if (inputArray[1].equals("lsend")) {	//	上传
+		else if (inputArray[1].equals("lsend")) {	//	锟较达拷
 			myClient.Upload(fileName);
 		}
 	}
