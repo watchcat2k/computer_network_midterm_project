@@ -4,6 +4,10 @@ public class ServerMain {
 	public static void main(String[] args) {
 		int port = 8080;
 		MyServer server = new MyServer(port);
-		server.connect();
+		while (true) {
+			server.receiveFirstPacketAndNewThread();
+		}
+	
 	}
+	
 }

@@ -35,6 +35,7 @@ public class MyClient {
 		Datagram response = receive();
 		if (response.getACK() == 1) {
 			fileTranPort = response.getPort();
+			System.out.println("获取的端口号为" + fileTranPort);
 		}
 		
 		sendFile();
