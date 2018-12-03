@@ -90,7 +90,10 @@ public class MyClient {
 							  map.remove(i);  
 							  mapLock.unlock();
 							  base++;
+						
 							  fileRead(filePath, 1);
+							  
+							  
 						  }
 						  rwnd = datagram.getRwnd();
 					  }
@@ -109,6 +112,7 @@ public class MyClient {
 				break;
 			}
 			mapLock.unlock();
+			
 			if (nextSeqNum - base <= rwnd) {
 				if (map.get(nextSeqNum) != null) {
 					send(map.get(nextSeqNum));

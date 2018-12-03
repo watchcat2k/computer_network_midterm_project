@@ -83,6 +83,7 @@ public class MyServer implements Runnable {
 				map.put(requestDatagram.getSeq(), requestDatagram);
 				while(map.get(y) != null) {
 					writeMapToFile(map.get(y).getBuf());
+					map.remove(y);
 					y++;
 				}
 				
