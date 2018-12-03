@@ -1,8 +1,13 @@
 package midterm_project.client;
 
+import java.io.File;
+import java.io.RandomAccessFile;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
+import java.util.HashMap;
+import java.util.Map;
+
 import midterm_project.datagram.Format;
 import midterm_project.datagram.Datagram;
 
@@ -13,10 +18,17 @@ public class MyClient {
 	private int x = 0;
 	private int y = 0;
 	private int fileTranPort;
+	private int packetSize = 1024 * 64;
+	private int fileSize = 1024 * 32;
+	private Map<Integer, Datagram> map;
+	private int rwnd;
+	private int hasSent;		//	已发送但未被ACK=1的数据包的数量
 	
 	public MyClient(int sourcePort, String destinationIp) {
 		this.sourcePort = sourcePort;
 		this.destinationIp = destinationIp;
+		
+		map = new HashMap<Integer, Datagram>();
 		
 		try {
 			client = new DatagramSocket(sourcePort);
@@ -26,6 +38,7 @@ public class MyClient {
 	}
 	
 	public void Upload(String filePath) {
+		
 		//	发送表示上传的数据包并接收响应
 		Datagram upload = new Datagram();
 		upload.setType(0);
@@ -37,7 +50,7 @@ public class MyClient {
 			System.out.println("获取的端口号为" + fileTranPort);
 		}
 		
-		sendFile();
+		sendFile(filePath);
 		
 		//	断开连接
 		Datagram disconnect = new Datagram();
@@ -85,7 +98,7 @@ public class MyClient {
 	//	接收数据包
 	private Datagram receive() {
 		try {
-			byte[] resposeData = new byte[1024];
+			byte[] resposeData = new byte[packetSize];
 			DatagramPacket resposePacket = new DatagramPacket(resposeData, resposeData.length);
 			client.receive(resposePacket);
 			Datagram datagram = Format.byteArrayToDatagram(resposeData);
@@ -97,8 +110,37 @@ public class MyClient {
 	}
 	
 	//	上传文件
-	private void sendFile() {
+	private void sendFile(String filePath) {
+		//	读取100个Datagram到缓冲区
+		fileRead(filePath, 100);
 		
+		//	子线程--接收响应
+		new Thread(new Runnable() {
+		  @Override
+		  public void run() {
+			  while (true) {
+				  Datagram datagram = receive();
+				  if (datagram.getACK() == 1) {
+					  map.remove(datagram.getSeq());
+					  rwnd = datagram.getRwnd();
+					  hasSent--;
+					  fileRead(filePath, 1);
+					  
+					  if (datagram.getFIN() == 1) {
+						  break;
+					  }
+				  }
+			  }
+		  }
+		}).start();
+		
+		//	主线程--发送数据包
+		hasSent = 0;		
+		while (!map.isEmpty()) {
+			if (hasSent <= rwnd) {
+				send(map.get(x));
+			}
+		}
 	}
 	
 	//	下载文件
@@ -110,6 +152,29 @@ public class MyClient {
 				break;
 			}
 		}
+	}
+	
+	private boolean fileRead(String FilePath, int num) {		//	num表示读取数, 返回false代表文件读取完毕
+		File src = new File(FilePath);
+		RandomAccessFile rFile;
+		try {
+			rFile = new RandomAccessFile(src, "r");
+			rFile.seek(x * fileSize);
+			for (int i = 0; i < num; i++) {
+				Datagram datagram = new Datagram();
+				byte[] buf = new byte[fileSize];
+				if (rFile.read(buf) == -1) {
+					return false;
+				}
+				datagram.setPort(fileTranPort);
+				datagram.setBuf(buf);
+				datagram.setSeq(x + i);
+				map.put(x + i, datagram);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return true;
 	}
 }
 
