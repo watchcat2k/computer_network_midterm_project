@@ -10,14 +10,34 @@ public class Datagram implements Serializable {
 	private int type;	//	0表示上传, 1表示下载
 	private int port;	//	指定服务器端口号
 	private String filePath;	//	传输文件名
-	
+	private byte[] buf;
+	private int rwnd;	//	流量控制
+
 	public Datagram() {
-		ACK = 0;
+		ACK = 0;          
 		FIN = 0;
 		seq = 0;
 		ack = 0;
 		port = 8080;
 		filePath = "";
+		buf = new byte[1024 * 32];
+		rwnd = 100;
+	}
+	
+	public int getRwnd() {
+		return rwnd;
+	}
+
+	public void setRwnd(int rwnd) {
+		this.rwnd = rwnd;
+	}
+	
+	public byte[] getBuf() {
+		return buf;
+	}
+
+	public void setBuf(byte[] buf) {
+		this.buf = buf;
 	}
 	
 	public String getFilePath() {
