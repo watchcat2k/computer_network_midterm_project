@@ -29,7 +29,6 @@ public class MyClient {
 	private int fileReadNum = 0;
 	private Map<Integer, Datagram> map;
 	private int rwnd;
-	private int hasSent;		//	已发送但未被ACK=1的数据包的数量
 	private static Lock mapLock  = new ReentrantLock();
 	
 	public MyClient(int sourcePort, String destinationIp) {
@@ -90,7 +89,6 @@ public class MyClient {
 							  mapLock.lock();
 							  map.remove(i);  
 							  mapLock.unlock();
-							  hasSent--;
 							  fileRead(filePath, 1);
 						  }
 						  base = datagram.getAck();
@@ -104,8 +102,6 @@ public class MyClient {
 		//	主线程--传输数据包
 		fileRead(filePath, 100);
 		
-		
-		hasSent = 0;		
 		while (true) {
 			mapLock.lock();
 			if (map.isEmpty()) {
@@ -113,14 +109,14 @@ public class MyClient {
 				break;
 			}
 			mapLock.unlock();
-			if (hasSent <= rwnd) {
+			if (nextSeqNum - base <= rwnd) {
 				if (map.get(nextSeqNum) != null) {
 					send(map.get(nextSeqNum));
 					nextSeqNum++;
-					hasSent++;
 				}
 			}
 		}
+		
 		
 		//	传输完成, 主动断开连接
 		Datagram disconnect = new Datagram();
@@ -141,7 +137,6 @@ public class MyClient {
 		}
 		
 		receiveFile();
-		
 		
 		//	断开连接
 		Datagram disconnect = new Datagram();
@@ -187,7 +182,7 @@ public class MyClient {
 		}
 	}
 	
-	private void fileRead(String FilePath, int num) {		//	num表示读取数, 返回false代表文件读取完毕
+	private void fileRead(String FilePath, int num) {		//	num表示读取数
 		File src = new File(FilePath);
 		RandomAccessFile rFile;
 		try {
