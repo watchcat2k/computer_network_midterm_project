@@ -29,7 +29,7 @@ public class MyClient {
 		//	发送表示上传的数据包并接收响应
 		Datagram upload = new Datagram();
 		upload.setType(0);
-		upload.setFileName(filePath);
+		upload.setFilePath(filePath);
 		send(upload);
 		Datagram uploadResponse = receive();
 		if (uploadResponse.getACK() == 1) {
