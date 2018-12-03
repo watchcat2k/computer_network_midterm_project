@@ -197,9 +197,9 @@ public class MyClient {
 				fileReadNum++;
 				datagram.setPort(fileTranPort);
 				datagram.setBuf(buf);
-				datagram.setSeq(base + i);
+				datagram.setSeq(fileReadNum + i);
 				mapLock.lock();
-				map.put(base + i, datagram);
+				map.put(fileReadNum + i, datagram);
 				mapLock.unlock();
 			}
 		} catch (Exception e) {
