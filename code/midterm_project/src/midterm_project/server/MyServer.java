@@ -7,6 +7,8 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.sql.Connection;
 import java.text.Format;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.xml.transform.Templates;
 
@@ -17,6 +19,7 @@ public class MyServer implements Runnable {
 	private DatagramSocket server = null;
 	private DatagramPacket requstPacket = null;
 	private byte[] container;
+	private int containerSize = 1024 * 64;
 	private int port;
 	private int x = 0;   //客户端分组序号
 	private int y = 0;   //服务端分组序号
@@ -24,17 +27,20 @@ public class MyServer implements Runnable {
 	private String filePath; //要上传或下载的文件的路径
 	private InetAddress clientAddress;
 	private int clientPort;
+	private Map<Integer, Datagram> map;
 	public static int idlePort = 8081;  //闲置的端口,每次加1
-
+	
 	public MyServer(int _port) {
 		//创建服务器及端口
 		try {
 			port = _port;
 			server = new DatagramSocket(port);
 			//准备容器,大小为1kB
-			container = new byte[1024];   
+			container = new byte[containerSize];   
 			//封装成包
 			requstPacket = new DatagramPacket(container, container.length);
+			//map初始化
+			map = new HashMap<Integer, Datagram>();
 		} catch (SocketException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -57,57 +63,44 @@ public class MyServer implements Runnable {
 	
 	public void clientUplaod() {
 		while (true) {
-			try {		
-				server.receive(requstPacket);
-				byte[] requestData = requstPacket.getData();
-				Datagram requestDatagram = midterm_project.datagram.Format.byteArrayToDatagram(requestData);
+			Datagram requestDatagram = receivePacketAndFormat();
+			
+			////接受到fin = 1,结束连接，发送对方ACK=1
+			if (requestDatagram.getFIN() == 1) {
+				Datagram reposeDatagram = new Datagram();
+				reposeDatagram.setACK(1);
+				reposeDatagram.setFIN(1);
+				sendPacketAndFormat(reposeDatagram);
 				
-				////接受到fin = 1,结束连接，发送对方ACK=1
-				if (requestDatagram.getFIN() == 1) {
-					Datagram reposeDatagram = new Datagram();
-					reposeDatagram.setACK(1);
-					byte[] resposeData = midterm_project.datagram.Format.datagramToByteArray(reposeDatagram);
-					DatagramPacket resposePacket = new DatagramPacket(resposeData, resposeData.length, clientAddress, clientPort);
-					server.send(resposePacket);
-					
-					server.close();
-					System.out.println("端口为 " + port + " 的服务器已经断开连接");
-					break;
-				}
-				else {
-					
-				}
-				
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				server.close();
+				System.out.println("端口为 " + port + " 的服务器已经断开连接");
+				break;
 			}
+			else {
+				map.put(requestDatagram.getSeq(), requestDatagram);
+				Datagram resposeDatagram = new Datagram();
+				resposeDatagram.setACK(1);
+				resposeDatagram.setRwnd(100 - map.size());
+				sendPacketAndFormat(resposeDatagram);
+			}
+				
 			
 		}
 	}
 	
 	public void clientDowload() {
-		try {
-			//主动发送结束连接fin = 1
-			Datagram reposeDatagram = new Datagram();
-			reposeDatagram.setFIN(1);
-			byte[] resposeData = midterm_project.datagram.Format.datagramToByteArray(reposeDatagram);
-			DatagramPacket resposePacket = new DatagramPacket(resposeData, resposeData.length, clientAddress, clientPort);
-			server.send(resposePacket);
-			
-			//接受对方发来的确认ACK=1
-			server.receive(requstPacket);
-			byte[] requestData = requstPacket.getData();
-			Datagram requestDatagram = midterm_project.datagram.Format.byteArrayToDatagram(requestData);
-			if (requestDatagram.getACK() == 1) {
-				server.close();
-				System.out.println("端口为 " + port + " 的服务器已经断开连接");
-			}
-			
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		//主动发送结束连接fin = 1
+		Datagram reposeDatagram = new Datagram();
+		reposeDatagram.setFIN(1);
+		sendPacketAndFormat(reposeDatagram);
+		
+		//接受对方发来的确认ACK=1
+		Datagram requestDatagram = receivePacketAndFormat();
+		if (requestDatagram.getACK() == 1) {
+			server.close();
+			System.out.println("端口为 " + port + " 的服务器已经断开连接");
 		}
+			
 	}
 	
 	public int avaliblePort() {
@@ -117,42 +110,61 @@ public class MyServer implements Runnable {
 	}
 	
 	public void receiveFirstPacketAndNewThread() {
+		//接受第一个	
+		System.out.println("main thread server is wating for data......");
+		Datagram firstDatagram = receivePacketAndFormat();
+		System.out.println("main thread server has received data.");	
+		setType(firstDatagram.getType());
+		setFilePath(firstDatagram.getFilePath());
+		setClientAddress(requstPacket.getAddress());
+		setClientPort(requstPacket.getPort());
+		
+		int subport = createSubThread(); //返回子线程服务器的端口
+		
+		//发送第一个
+		Datagram secondDatagram = new Datagram();
+		secondDatagram.setACK(1);
+		secondDatagram.setPort(subport);
+		sendPacketAndFormat(secondDatagram);		
+		
+	}
+	
+	private int createSubThread() {
+		//创建线程
+		int subport = avaliblePort();
+		MyServer subServer = new MyServer(subport);
+		subServer.setType(type);
+		subServer.setFilePath(filePath);
+		subServer.setClientAddress(clientAddress);
+		subServer.setClientPort(clientPort);
+		Thread subThread = new Thread(subServer, subport + "");
+		subThread.start();
+		return subport;
+	}
+	
+	private Datagram receivePacketAndFormat() {
 		try {
-			//接受第一个	
-			System.out.println("main thread server is wating for data......");
 			server.receive(requstPacket);
-			System.out.println("main thread server has received data.");
 			byte[] requestData = requstPacket.getData();
-			Datagram firstDatagram = midterm_project.datagram.Format.byteArrayToDatagram(requestData);			
-			int operateType = firstDatagram.getType();
-			String operateFilePath = firstDatagram.getFilePath();
-			setClientAddress(requstPacket.getAddress());
-			setClientPort(requstPacket.getPort());
-			
-			//创建线程
-			int subport = avaliblePort();
-			MyServer subServer = new MyServer(subport);
-			subServer.setType(operateType);
-			subServer.setFilePath(operateFilePath);
-			subServer.setClientAddress(clientAddress);
-			subServer.setClientPort(clientPort);
-			Thread subThread = new Thread(subServer, subport + "");
-			subThread.start();
-			
-			//发送第一个
-			Datagram secondDatagram = new Datagram();
-			secondDatagram.setACK(1);
-			secondDatagram.setPort(subport);
-			byte[] resposeData = midterm_project.datagram.Format.datagramToByteArray(secondDatagram);
-			DatagramPacket resposePacket = new DatagramPacket(resposeData, resposeData.length, clientAddress, clientPort);
-			server.send(resposePacket);
-			
+			Datagram requestDatagram = midterm_project.datagram.Format.byteArrayToDatagram(requestData);	
+			return requestDatagram;
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}	
+			return null;
+		}
 	}
 	
+	private void sendPacketAndFormat(Datagram reposeDatagram) {
+		try {
+			byte[] resposeData = midterm_project.datagram.Format.datagramToByteArray(reposeDatagram);
+			DatagramPacket resposePacket = new DatagramPacket(resposeData, resposeData.length, clientAddress, clientPort);
+			server.send(resposePacket);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 	
 	public int getType() {
 		return type;
