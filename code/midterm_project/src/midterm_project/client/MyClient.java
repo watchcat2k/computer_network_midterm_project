@@ -12,7 +12,6 @@ import java.util.TimerTask;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import javax.xml.transform.Templates;
 
 import midterm_project.datagram.Format;
 import midterm_project.datagram.Datagram;
@@ -27,6 +26,7 @@ public class MyClient {
 	private int fileTranPort;
 	private int packetSize = 1024 * 64;
 	private int fileSize = 1024 * 32;
+	private int fileReadNum = 0;
 	private Map<Integer, Datagram> map;
 	private int rwnd;
 	private int hasSent;		//	已发送但未被ACK=1的数据包的数量
@@ -187,18 +187,19 @@ public class MyClient {
 		}
 	}
 	
-	private boolean fileRead(String FilePath, int num) {		//	num表示读取数, 返回false代表文件读取完毕
+	private void fileRead(String FilePath, int num) {		//	num表示读取数, 返回false代表文件读取完毕
 		File src = new File(FilePath);
 		RandomAccessFile rFile;
 		try {
 			rFile = new RandomAccessFile(src, "r");
-			rFile.seek(base * fileSize);
+			rFile.seek(fileReadNum * fileSize);
 			for (int i = 0; i < num; i++) {
 				Datagram datagram = new Datagram();
 				byte[] buf = new byte[fileSize];
 				if (rFile.read(buf) == -1) {
-					return false;
+					break;
 				}
+				fileReadNum++;
 				datagram.setPort(fileTranPort);
 				datagram.setBuf(buf);
 				datagram.setSeq(base + i);
@@ -209,7 +210,6 @@ public class MyClient {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		return true;
 	}
 }
 
