@@ -28,8 +28,11 @@ public class MyClient {
 	private int fileSize = 1024 * 32;
 	private int fileReadNum = 0;
 	private Map<Integer, Datagram> map;
-	private int rwnd;
+	private int rwnd;			//	流量控制
+	private int cwnd = 1;		//	拥塞控制当前值
+	private int ssthresh = 8;	//	拥塞控制阈值	
 	private static Lock mapLock  = new ReentrantLock();
+	private static Lock cwndLock = new ReentrantLock();
 	
 	public MyClient(int sourcePort, String destinationIp) {
 		this.sourcePort = sourcePort;
@@ -58,7 +61,7 @@ public class MyClient {
 		}
 		
 		
-		//	开启计时器, 每隔1s检查是否丢包
+		//	开启计时器, 每隔0.5s检查是否丢包
         Timer timer = new Timer();  
         long delay = 0;  
         long intevalPeriod = 1 * 500;  
@@ -68,6 +71,10 @@ public class MyClient {
             public void run() {  
             	if (base == prevBase) {
             		nextSeqNum = base;
+            		cwndLock.lock();
+            		ssthresh = cwnd / 2;
+            		cwnd = 1;
+            		cwndLock.unlock();
             	} else {
             		prevBase = base;
             	}
@@ -89,11 +96,15 @@ public class MyClient {
 							  mapLock.lock();
 							  map.remove(i);  
 							  mapLock.unlock();
+							  if (cwnd < ssthresh) {
+								  cwnd *= 2;
+							  }
+							  else {
+								  cwnd++;
+							  }
 							  base++;
 						
 							  fileRead(filePath, 1);
-							  
-							  
 						  }
 						  rwnd = datagram.getRwnd();
 					  }
@@ -113,11 +124,13 @@ public class MyClient {
 			}
 			mapLock.unlock();
 			
-			if (nextSeqNum - base <= rwnd) {
-				if (map.get(nextSeqNum) != null) {
-					send(map.get(nextSeqNum));
-					nextSeqNum++;
-				}
+			for (int i = 0; i < cwnd; i++) {
+				if (nextSeqNum - base <= rwnd) {
+					if (map.get(nextSeqNum) != null) {
+						send(map.get(nextSeqNum));
+						nextSeqNum++;
+					}
+				}	
 			}
 		}
 		
