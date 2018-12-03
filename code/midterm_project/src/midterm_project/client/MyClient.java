@@ -12,6 +12,8 @@ import java.util.TimerTask;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import javax.xml.transform.Templates;
+
 import midterm_project.datagram.Format;
 import midterm_project.datagram.Datagram;
 
@@ -99,20 +101,9 @@ public class MyClient {
 		  }
 		}).start();
 		
-		//	主线程--发送
-		sendFile(filePath);
-		
-		//	断开连接
-		Datagram disconnect = new Datagram();
-		disconnect.setFIN(1);
-		disconnect.setPort(fileTranPort);
-		send(disconnect);
-	}
-	
-	//	上传文件
-	private void sendFile(String filePath) {
-		//	读取100个Datagram到缓冲区
+		//	主线程--传输数据包
 		fileRead(filePath, 100);
+		
 		
 		hasSent = 0;		
 		while (true) {
@@ -123,10 +114,19 @@ public class MyClient {
 			}
 			mapLock.unlock();
 			if (hasSent <= rwnd) {
-				send(map.get(nextSeqNum++));
-				hasSent++;
+				if (map.get(nextSeqNum) != null) {
+					send(map.get(nextSeqNum));
+					nextSeqNum++;
+					hasSent++;
+				}
 			}
 		}
+		
+		//	传输完成, 主动断开连接
+		Datagram disconnect = new Datagram();
+		disconnect.setFIN(1);
+		disconnect.setPort(fileTranPort);
+		send(disconnect);
 	}
 	
 	public void Download(String filePath) {
