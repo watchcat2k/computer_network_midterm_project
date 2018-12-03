@@ -61,7 +61,7 @@ public class MyClient {
 		//	开启计时器, 每隔1s检查是否丢包
         Timer timer = new Timer();  
         long delay = 0;  
-        long intevalPeriod = 1 * 1000;  
+        long intevalPeriod = 1 * 500;  
         
         timer.scheduleAtFixedRate(new TimerTask() {  
             @Override  
@@ -89,9 +89,9 @@ public class MyClient {
 							  mapLock.lock();
 							  map.remove(i);  
 							  mapLock.unlock();
+							  base++;
 							  fileRead(filePath, 1);
 						  }
-						  base = datagram.getAck();
 						  rwnd = datagram.getRwnd();
 					  }
 				  }
