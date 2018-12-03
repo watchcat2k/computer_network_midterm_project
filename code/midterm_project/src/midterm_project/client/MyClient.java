@@ -17,8 +17,8 @@ public class MyClient {
 	private int sourcePort;
 	private String destinationIp;
 	private DatagramSocket client;
-	private int x = 0;
-	private int y = 0;
+	private int base = 0;			//	最小未接收到的分组号
+	private int nextSeqNum = 0;		//	最小未发送的分组号
 	private int fileTranPort;
 	private int packetSize = 1024 * 64;
 	private int fileSize = 1024 * 32;
@@ -59,17 +59,17 @@ public class MyClient {
 		  public void run() {
 			  while (true) {
 				  Datagram datagram = receive();
-				  if (datagram.getACK() == 1) {
-					  mapLock.lock();
-					  map.remove(datagram.getSeq());
-					  mapLock.unlock();
-					  rwnd = datagram.getRwnd();
-					  hasSent--;
-					  fileRead(filePath, 1);
-					  
+				  if (datagram.getACK() == 1) {					  
 					  if (datagram.getFIN() == 1) {
 						  System.out.println("客户端" + sourcePort + "已断开连接");
 						  break;
+					  } else {
+						  mapLock.lock();
+						  map.remove(datagram.getSeq());
+						  mapLock.unlock();
+						  rwnd = datagram.getRwnd();
+						  hasSent--;
+						  fileRead(filePath, 1);
 					  }
 				  }
 			  }
@@ -147,7 +147,7 @@ public class MyClient {
 			}
 			mapLock.unlock();
 			if (hasSent <= rwnd) {
-				send(map.get(x));
+				send(map.get(nextSeqNum++));
 				hasSent++;
 			}
 		}
@@ -169,7 +169,7 @@ public class MyClient {
 		RandomAccessFile rFile;
 		try {
 			rFile = new RandomAccessFile(src, "r");
-			rFile.seek(x * fileSize);
+			rFile.seek(base * fileSize);
 			for (int i = 0; i < num; i++) {
 				Datagram datagram = new Datagram();
 				byte[] buf = new byte[fileSize];
@@ -178,9 +178,9 @@ public class MyClient {
 				}
 				datagram.setPort(fileTranPort);
 				datagram.setBuf(buf);
-				datagram.setSeq(x + i);
+				datagram.setSeq(base + i);
 				mapLock.lock();
-				map.put(x + i, datagram);
+				map.put(base + i, datagram);
 				mapLock.unlock();
 			}
 		} catch (Exception e) {
