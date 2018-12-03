@@ -66,6 +66,7 @@ public class MyClient {
 		//	断开连接
 		Datagram disconnect = new Datagram();
 		disconnect.setACK(1);
+		disconnect.setPort(fileTranPort);
 		send(disconnect);
 	}
 	
