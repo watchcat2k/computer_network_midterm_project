@@ -4,7 +4,6 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import midterm_project.datagram.Format;
-
 import midterm_project.datagram.Datagram;
 
 public class MyClient {
@@ -19,56 +18,81 @@ public class MyClient {
 		this.sourcePort = sourcePort;
 		this.destinationIp = destinationIp;
 		this.destinationPort = destinationPort;
-	}
-	
-	//	三次握手
-	public void connect() {
+		
 		try {
 			client = new DatagramSocket(sourcePort);
-			
-			//	发送第一次握手
-			Datagram firstConnect = new Datagram();
-			firstConnect.setSYN(1);
-			firstConnect.setSeq(x);
-			byte[] requstData = Format.datagramToByteArray(firstConnect);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public void Upload() {
+		//	发送表示上传的数据包并接收响应
+		Datagram upload = new Datagram();
+		upload.setType(0);
+		upload.setSeq(x);
+		send(upload);
+		Datagram response = receive();
+		if (response.getACK() == 1) {
+			x++;
+			y = response.getSeq();
+		}
+		
+		sendFile();
+	}
+	
+	public void Download() {
+		//	发送表示下载的数据包并接收响应
+		Datagram download = new Datagram();
+		download.setType(1);
+		download.setSeq(x);
+		send(download);
+		Datagram response = receive();
+		if (response.getACK() == 1) {
+			x++;
+			y = response.getSeq();
+		}
+		
+		receiveFile();
+	}
+	
+	
+	//	发送数据包
+	private void send(Datagram upload) {
+		try {
+			byte[] requstData = Format.datagramToByteArray(upload);
 			DatagramPacket requstPacket = new DatagramPacket(requstData, requstData.length, new InetSocketAddress(destinationIp, destinationPort));
 			client.send(requstPacket);
-			x++;
-			
-			//	接收第二次握手
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	//	接收数据包
+	private Datagram receive() {
+		try {
 			byte[] resposeData = new byte[1024];
 			DatagramPacket resposePacket = new DatagramPacket(resposeData, resposeData.length);
 			client.receive(resposePacket);
-			Datagram secondConnect = Format.byteArrayToDatagram(resposeData);
-			
-			if (secondConnect.getSYN() == 1 && secondConnect.getACK() == 1) {
-				y = secondConnect.getSeq();
-			}
-			
-			//	发送第三次握手
-			Datagram thirdConnect = new Datagram();
-			thirdConnect.setACK(1);
-			thirdConnect.setSeq(x);
-			thirdConnect.setAck(y + 1);
-			requstData = Format.datagramToByteArray(thirdConnect);
-			requstPacket = new DatagramPacket(requstData, requstData.length, new InetSocketAddress(destinationIp, destinationPort));
-			client.send(requstPacket);
-			x++;
+			Datagram datagram = Format.byteArrayToDatagram(resposeData);
+			return datagram;
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		return null;
 	}
 	
-	//	四次挥手
-	public void disconnect() {
+	private void sendFile() {
+		
+	}
+	
+	private void receiveFile() {
 		
 		
+	}
+	
+	private void disconnect() {
 		
-		try {
-			client.close();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
 	}
 }
 
