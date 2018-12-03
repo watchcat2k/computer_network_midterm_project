@@ -65,10 +65,13 @@ public class MyClient {
 						  break;
 					  } else {
 						  mapLock.lock();
-						  map.remove(datagram.getSeq());
+						  for (int i = base; i < datagram.getAck(); i++) {
+							  map.remove(i);  
+							  hasSent--;
+						  }
 						  mapLock.unlock();
+						  base = datagram.getAck();
 						  rwnd = datagram.getRwnd();
-						  hasSent--;
 						  fileRead(filePath, 1);
 					  }
 				  }
