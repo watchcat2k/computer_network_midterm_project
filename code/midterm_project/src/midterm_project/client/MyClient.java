@@ -12,7 +12,8 @@ public class MyClient {
 	private int destinationPort;
 	private DatagramSocket client;
 	private int x = 0;
-	private int y;
+	private int y = 0;
+	private int fileTranPort;
 	
 	public MyClient(int sourcePort, String destinationIp, int destinationPort) {
 		this.sourcePort = sourcePort;
@@ -30,12 +31,10 @@ public class MyClient {
 		//	发送表示上传的数据包并接收响应
 		Datagram upload = new Datagram();
 		upload.setType(0);
-		upload.setSeq(x);
 		send(upload);
 		Datagram response = receive();
 		if (response.getACK() == 1) {
-			x++;
-			y = response.getSeq();
+			fileTranPort = response.getPort();
 		}
 		
 		sendFile();
@@ -45,12 +44,10 @@ public class MyClient {
 		//	发送表示下载的数据包并接收响应
 		Datagram download = new Datagram();
 		download.setType(1);
-		download.setSeq(x);
 		send(download);
 		Datagram response = receive();
 		if (response.getACK() == 1) {
-			x++;
-			y = response.getSeq();
+			fileTranPort = response.getPort();
 		}
 		
 		receiveFile();
