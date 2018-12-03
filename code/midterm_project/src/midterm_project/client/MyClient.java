@@ -9,16 +9,14 @@ import midterm_project.datagram.Datagram;
 public class MyClient {
 	private int sourcePort;
 	private String destinationIp;
-	private int destinationPort;
 	private DatagramSocket client;
 	private int x = 0;
 	private int y = 0;
 	private int fileTranPort;
 	
-	public MyClient(int sourcePort, String destinationIp, int destinationPort) {
+	public MyClient(int sourcePort, String destinationIp) {
 		this.sourcePort = sourcePort;
 		this.destinationIp = destinationIp;
-		this.destinationPort = destinationPort;
 		
 		try {
 			client = new DatagramSocket(sourcePort);
@@ -27,11 +25,11 @@ public class MyClient {
 		}
 	}
 	
-	public void Upload(String fileName) {
+	public void Upload(String filePath) {
 		//	发送表示上传的数据包并接收响应
 		Datagram upload = new Datagram();
 		upload.setType(0);
-		upload.setFileName(fileName);
+		upload.setFileName(filePath);
 		send(upload);
 		Datagram uploadResponse = receive();
 		if (uploadResponse.getACK() == 1) {
@@ -44,6 +42,7 @@ public class MyClient {
 		//	断开连接
 		Datagram disconnect = new Datagram();
 		disconnect.setFIN(1);
+		disconnect.setPort(fileTranPort);
 		send(disconnect);
 		Datagram disconnectResponse = receive();
 		if (disconnectResponse.getACK() == 1) {
@@ -51,11 +50,11 @@ public class MyClient {
 		}
 	}
 	
-	public void Download(String fileName) {
+	public void Download(String filePath) {
 		//	发送表示下载的数据包并接收响应
 		Datagram download = new Datagram();
 		download.setType(1);
-		download.setFileName(fileName);
+		download.setFilePath(filePath);
 		send(download);
 		Datagram response = receive();
 		if (response.getACK() == 1) {
@@ -75,7 +74,7 @@ public class MyClient {
 	private void send(Datagram upload) {
 		try {
 			byte[] requstData = Format.datagramToByteArray(upload);
-			DatagramPacket requstPacket = new DatagramPacket(requstData, requstData.length, new InetSocketAddress(destinationIp, destinationPort));
+			DatagramPacket requstPacket = new DatagramPacket(requstData, requstData.length, new InetSocketAddress(destinationIp, upload.getPort()));
 			client.send(requstPacket);
 		} catch (Exception e) {
 			e.printStackTrace();
