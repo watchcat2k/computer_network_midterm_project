@@ -7,6 +7,8 @@ import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -18,6 +20,7 @@ public class MyClient {
 	private String destinationIp;
 	private DatagramSocket client;
 	private int base = 0;			//	最小未接收到的分组号
+	private int prevBase = base;	//	1s前的base
 	private int nextSeqNum = 0;		//	最小未发送的分组号
 	private int fileTranPort;
 	private int packetSize = 1024 * 64;
@@ -53,6 +56,23 @@ public class MyClient {
 			System.out.println("获取的端口号为" + fileTranPort);
 		}
 		
+		
+		//	开启计时器, 每隔1s检查是否丢包
+        Timer timer = new Timer();  
+        long delay = 0;  
+        long intevalPeriod = 1 * 1000;  
+        
+        timer.scheduleAtFixedRate(new TimerTask() {  
+            @Override  
+            public void run() {  
+            	if (base == prevBase) {
+            		nextSeqNum = base;
+            	} else {
+            		prevBase = base;
+            	}
+            }  
+        }, delay, intevalPeriod);
+		
 		//	子线程--接收响应
 		new Thread(new Runnable() {
 		  @Override
@@ -64,15 +84,15 @@ public class MyClient {
 						  System.out.println("客户端" + sourcePort + "已断开连接");
 						  break;
 					  } else {
-						  mapLock.lock();
 						  for (int i = base; i < datagram.getAck(); i++) {
+							  mapLock.lock();
 							  map.remove(i);  
+							  mapLock.unlock();
 							  hasSent--;
+							  fileRead(filePath, 1);
 						  }
-						  mapLock.unlock();
 						  base = datagram.getAck();
 						  rwnd = datagram.getRwnd();
-						  fileRead(filePath, 1);
 					  }
 				  }
 			  }
@@ -87,6 +107,26 @@ public class MyClient {
 		disconnect.setFIN(1);
 		disconnect.setPort(fileTranPort);
 		send(disconnect);
+	}
+	
+	//	上传文件
+	private void sendFile(String filePath) {
+		//	读取100个Datagram到缓冲区
+		fileRead(filePath, 100);
+		
+		hasSent = 0;		
+		while (true) {
+			mapLock.lock();
+			if (map.isEmpty()) {
+				mapLock.unlock();
+				break;
+			}
+			mapLock.unlock();
+			if (hasSent <= rwnd) {
+				send(map.get(nextSeqNum++));
+				hasSent++;
+			}
+		}
 	}
 	
 	public void Download(String filePath) {
@@ -134,26 +174,6 @@ public class MyClient {
 			e.printStackTrace();
 		}
 		return null;
-	}
-	
-	//	上传文件
-	private void sendFile(String filePath) {
-		//	读取100个Datagram到缓冲区
-		fileRead(filePath, 100);
-		
-		hasSent = 0;		
-		while (true) {
-			mapLock.lock();
-			if (map.isEmpty()) {
-				mapLock.unlock();
-				break;
-			}
-			mapLock.unlock();
-			if (hasSent <= rwnd) {
-				send(map.get(nextSeqNum++));
-				hasSent++;
-			}
-		}
 	}
 	
 	//	下载文件
