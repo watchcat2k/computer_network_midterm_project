@@ -1,5 +1,8 @@
 package midterm_project.server;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -21,8 +24,8 @@ public class MyServer implements Runnable {
 	private byte[] container;
 	private int containerSize = 1024 * 64;
 	private int port;
-	private int x = 0;   //客户端分组序号
-	private int y = 0;   //服务端分组序号
+	private int x = 0;   //客户端已接收的最小分组序号
+	private int y = 0;   //服务端已接收的最小分组序号
 	private int type;    //0代表客户端上传，1代表客户端下载
 	private String filePath; //要上传或下载的文件的路径
 	private InetAddress clientAddress;
@@ -64,7 +67,7 @@ public class MyServer implements Runnable {
 	public void clientUplaod() {
 		while (true) {
 			Datagram requestDatagram = receivePacketAndFormat();
-			
+			System.out.println("子线程 " + port + " 服务器接收到 " + requestDatagram.getSeq() + "号分组");
 			////接受到fin = 1,结束连接，发送对方ACK=1
 			if (requestDatagram.getFIN() == 1) {
 				Datagram reposeDatagram = new Datagram();
@@ -78,14 +81,41 @@ public class MyServer implements Runnable {
 			}
 			else {
 				map.put(requestDatagram.getSeq(), requestDatagram);
+				while(map.get(y) != null) {
+					writeMapToFile(map.get(y).getBuf());
+					y++;
+				}
+				
 				Datagram resposeDatagram = new Datagram();
 				resposeDatagram.setACK(1);
 				resposeDatagram.setRwnd(100 - map.size());
-				sendPacketAndFormat(resposeDatagram);
+				resposeDatagram.setAck(y);;
+				sendPacketAndFormat(resposeDatagram);			
 			}
 				
 			
 		}
+	}
+	
+	private void writeMapToFile(byte[] data) {
+		try {
+			String[] fileDecode = filePath.split("/");
+			String fileName = fileDecode[fileDecode.length - 1];
+			String storagePath = "D:/user_chen/network_test/" + fileName ;
+			File file = new File(storagePath);
+			if (!file.exists()) {
+				file.createNewFile();
+			}
+			FileOutputStream oStream = new FileOutputStream(file, true);
+			oStream.write(data, 0, data.length);
+			oStream.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		
+		
 	}
 	
 	public void clientDowload() {
