@@ -7,6 +7,8 @@ import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import midterm_project.datagram.Format;
 import midterm_project.datagram.Datagram;
@@ -23,6 +25,7 @@ public class MyClient {
 	private Map<Integer, Datagram> map;
 	private int rwnd;
 	private int hasSent;		//	已发送但未被ACK=1的数据包的数量
+	private static Lock mapLock  = new ReentrantLock();
 	
 	public MyClient(int sourcePort, String destinationIp) {
 		this.sourcePort = sourcePort;
@@ -50,6 +53,30 @@ public class MyClient {
 			System.out.println("获取的端口号为" + fileTranPort);
 		}
 		
+		//	子线程--接收响应
+		new Thread(new Runnable() {
+		  @Override
+		  public void run() {
+			  while (true) {
+				  Datagram datagram = receive();
+				  if (datagram.getACK() == 1) {
+					  mapLock.lock();
+					  map.remove(datagram.getSeq());
+					  mapLock.unlock();
+					  rwnd = datagram.getRwnd();
+					  hasSent--;
+					  fileRead(filePath, 1);
+					  
+					  if (datagram.getFIN() == 1) {
+						  System.out.println("客户端" + sourcePort + "已断开连接");
+						  break;
+					  }
+				  }
+			  }
+		  }
+		}).start();
+		
+		//	主线程--发送
 		sendFile(filePath);
 		
 		//	断开连接
@@ -57,10 +84,6 @@ public class MyClient {
 		disconnect.setFIN(1);
 		disconnect.setPort(fileTranPort);
 		send(disconnect);
-		Datagram disconnectResponse = receive();
-		if (disconnectResponse.getACK() == 1) {
-			System.out.println("客户端" + sourcePort + "已断开连接");
-		}
 	}
 	
 	public void Download(String filePath) {
@@ -75,6 +98,7 @@ public class MyClient {
 		}
 		
 		receiveFile();
+		
 		
 		//	断开连接
 		Datagram disconnect = new Datagram();
@@ -114,31 +138,17 @@ public class MyClient {
 		//	读取100个Datagram到缓冲区
 		fileRead(filePath, 100);
 		
-		//	子线程--接收响应
-		new Thread(new Runnable() {
-		  @Override
-		  public void run() {
-			  while (true) {
-				  Datagram datagram = receive();
-				  if (datagram.getACK() == 1) {
-					  map.remove(datagram.getSeq());
-					  rwnd = datagram.getRwnd();
-					  hasSent--;
-					  fileRead(filePath, 1);
-					  
-					  if (datagram.getFIN() == 1) {
-						  break;
-					  }
-				  }
-			  }
-		  }
-		}).start();
-		
-		//	主线程--发送数据包
 		hasSent = 0;		
-		while (!map.isEmpty()) {
+		while (true) {
+			mapLock.lock();
+			if (map.isEmpty()) {
+				mapLock.unlock();
+				break;
+			}
+			mapLock.unlock();
 			if (hasSent <= rwnd) {
 				send(map.get(x));
+				hasSent++;
 			}
 		}
 	}
@@ -169,7 +179,9 @@ public class MyClient {
 				datagram.setPort(fileTranPort);
 				datagram.setBuf(buf);
 				datagram.setSeq(x + i);
+				mapLock.lock();
 				map.put(x + i, datagram);
+				mapLock.unlock();
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
