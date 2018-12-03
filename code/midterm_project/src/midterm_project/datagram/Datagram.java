@@ -9,7 +9,7 @@ public class Datagram implements Serializable {
 	private int ack;	//	期望收到的下一个分组的序号
 	private int type;	//	0表示上传, 1表示下载
 	private int port;	//	指定服务器端口号
-	private String fileName;	//	传输文件名
+	private String filePath;	//	传输文件名
 	
 	public Datagram() {
 		ACK = 0;
@@ -17,15 +17,15 @@ public class Datagram implements Serializable {
 		seq = 0;
 		ack = 0;
 		port = 8080;
-		fileName = "";
+		filePath = "";
 	}
 	
-	public String getFileName() {
-		return fileName;
+	public String getFilePath() {
+		return filePath;
 	}
 
-	public void setFileName(String fileName) {
-		this.fileName = fileName;
+	public void setFilePath(String filePath) {
+		this.filePath = filePath;
 	}
 
 	public int getACK() {
