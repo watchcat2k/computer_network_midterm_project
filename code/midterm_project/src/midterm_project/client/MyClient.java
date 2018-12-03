@@ -26,7 +26,7 @@ public class MyClient {
 		}
 	}
 	
-	public void Upload() {
+	public void Upload(String fileName) {
 		//	发送表示上传的数据包并接收响应
 		Datagram upload = new Datagram();
 		upload.setType(0);
@@ -41,7 +41,7 @@ public class MyClient {
 		sendFile();
 	}
 	
-	public void Download() {
+	public void Download(String fileName) {
 		//	发送表示下载的数据包并接收响应
 		Datagram download = new Datagram();
 		download.setType(1);
@@ -82,15 +82,18 @@ public class MyClient {
 		return null;
 	}
 	
+	//	上传文件
 	private void sendFile() {
 		
 	}
 	
+	//	下载文件
 	private void receiveFile() {
 		
 		
 	}
 	
+	//	断开连接
 	private void disconnect() {
 		
 	}
