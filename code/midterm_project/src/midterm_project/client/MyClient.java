@@ -31,20 +31,31 @@ public class MyClient {
 		//	发送表示上传的数据包并接收响应
 		Datagram upload = new Datagram();
 		upload.setType(0);
+		upload.setFileName(fileName);
 		send(upload);
-		Datagram response = receive();
-		if (response.getACK() == 1) {
-			fileTranPort = response.getPort();
+		Datagram uploadResponse = receive();
+		if (uploadResponse.getACK() == 1) {
+			fileTranPort = uploadResponse.getPort();
 			System.out.println("获取的端口号为" + fileTranPort);
 		}
 		
 		sendFile();
+		
+		//	断开连接
+		Datagram disconnect = new Datagram();
+		disconnect.setFIN(1);
+		send(disconnect);
+		Datagram disconnectResponse = receive();
+		if (disconnectResponse.getACK() == 1) {
+			System.out.println("客户端" + sourcePort + "已断开连接");
+		}
 	}
 	
 	public void Download(String fileName) {
 		//	发送表示下载的数据包并接收响应
 		Datagram download = new Datagram();
 		download.setType(1);
+		download.setFileName(fileName);
 		send(download);
 		Datagram response = receive();
 		if (response.getACK() == 1) {
@@ -52,6 +63,11 @@ public class MyClient {
 		}
 		
 		receiveFile();
+		
+		//	断开连接
+		Datagram disconnect = new Datagram();
+		disconnect.setACK(1);
+		send(disconnect);
 	}
 	
 	
@@ -87,13 +103,13 @@ public class MyClient {
 	
 	//	下载文件
 	private void receiveFile() {
-		
-		
-	}
-	
-	//	断开连接
-	private void disconnect() {
-		
+		while (true) {
+			Datagram response = receive();
+			if (response.getFIN() == 1) {
+				System.out.println("客户端" + sourcePort + "已断开连接");
+				break;
+			}
+		}
 	}
 }
 
