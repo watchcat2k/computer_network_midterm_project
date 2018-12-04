@@ -28,6 +28,7 @@ public class MyServer implements Runnable {
 	private int y = 0;   //服务端已接收的最小分组序号
 	private int type;    //0代表客户端上传，1代表客户端下载
 	private String filePath; //要上传或下载的文件的路径
+	private String storagePath = "D:/user_chen/network_test/"; //要保存的文件的路径,注意后面要加上文件名
 	private InetAddress clientAddress;
 	private int clientPort;
 	private Map<Integer, Datagram> map;
@@ -65,9 +66,28 @@ public class MyServer implements Runnable {
 	}
 	
 	public void clientUplaod() {
+		//如果文件已存在，先删除，后再接受上传的文件
+		String[] fileDecode = filePath.split("/");
+		String fileName = fileDecode[fileDecode.length - 1];
+		String storageFilePath = storagePath + fileName ;
+		File file = new File(storageFilePath);
+		try {
+			if (!file.exists()) {
+				file.createNewFile();
+			}
+			else {
+				file.delete();
+				file.createNewFile();
+			}
+		}
+		catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
 		while (true) {
 			Datagram requestDatagram = receivePacketAndFormat();
-			System.out.println("子线程 " + port + " 服务器接收到 " + requestDatagram.getSeq() + "号分组");
+			System.out.println("子线程 " + port + " 服务器接收到 " + requestDatagram.getSeq() + "号分组 FIN=" +  requestDatagram.getFIN());
 			////接受到fin = 1,结束连接，发送对方ACK=1
 			if (requestDatagram.getFIN() == 1) {
 				Datagram reposeDatagram = new Datagram();
@@ -90,6 +110,7 @@ public class MyServer implements Runnable {
 				Datagram resposeDatagram = new Datagram();
 				resposeDatagram.setACK(1);
 				resposeDatagram.setRwnd(100 - map.size());
+				System.out.println("子线程"+ port + "缓冲区窗口空间剩余" + (100-map.size()));
 				resposeDatagram.setAck(y);;
 				sendPacketAndFormat(resposeDatagram);			
 			}
@@ -102,11 +123,8 @@ public class MyServer implements Runnable {
 		try {
 			String[] fileDecode = filePath.split("/");
 			String fileName = fileDecode[fileDecode.length - 1];
-			String storagePath = "D:/user_chen/network_test/" + fileName ;
-			File file = new File(storagePath);
-			if (!file.exists()) {
-				file.createNewFile();
-			}
+			String storageFilePath = storagePath + fileName ;
+			File file = new File(storageFilePath);
 			FileOutputStream oStream = new FileOutputStream(file, true);
 			oStream.write(data, 0, data.length);
 			oStream.close();
