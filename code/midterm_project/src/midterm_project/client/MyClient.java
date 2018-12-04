@@ -28,9 +28,9 @@ public class MyClient {
 	private int fileSize = 1024 * 32;
 	private int fileReadNum = 0;
 	private Map<Integer, Datagram> map;
-	private int rwnd;			//	流量控制
-	private int cwnd = 1;		//	拥塞控制当前值
-	private int ssthresh = 8;	//	拥塞控制阈值	
+	private int rwnd = 100;			//	流量控制
+	private int cwnd = 1;			//	拥塞控制当前值
+	private int ssthresh = 8;		//	拥塞控制阈值	
 	private static Lock mapLock  = new ReentrantLock();
 	private static Lock cwndLock = new ReentrantLock();
 	
@@ -98,7 +98,7 @@ public class MyClient {
 							  mapLock.lock();
 							  map.remove(i);  
 							  mapLock.unlock();
-							  System.out.println("分组" + i + "传输成功");
+							  System.out.println("分组" + i + "被成功接收");
 							  cwndLock.lock();
 							  if (cwnd < ssthresh) {
 								  cwnd *= 2;
