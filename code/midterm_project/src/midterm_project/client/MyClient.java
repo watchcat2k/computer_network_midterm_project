@@ -70,11 +70,13 @@ public class MyClient {
             @Override  
             public void run() {  
             	if (base == prevBase) {
+            		System.out.println("分组" + base + "丢失");
             		nextSeqNum = base;
             		cwndLock.lock();
             		ssthresh = cwnd / 2;
             		cwnd = 1;
             		cwndLock.unlock();
+            		System.out.println("拥塞控制处于快速恢复阶段, cwnd = " + cwnd + ", 阈值ssthresh = " + ssthresh);
             	} else {
             		prevBase = base;
             	}
@@ -96,14 +98,18 @@ public class MyClient {
 							  mapLock.lock();
 							  map.remove(i);  
 							  mapLock.unlock();
+							  System.out.println("分组" + i + "传输成功");
+							  cwndLock.lock();
 							  if (cwnd < ssthresh) {
 								  cwnd *= 2;
+								  System.out.println("拥塞控制处于慢启动阶段, cwnd = " + cwnd + ", 阈值ssthresh = " + ssthresh);
 							  }
 							  else {
 								  cwnd++;
+								  System.out.println("拥塞控制处于拥塞避免阶段, cwnd = " + cwnd + ", 阈值ssthresh = " + ssthresh);
 							  }
+							  cwndLock.unlock();
 							  base++;
-						
 							  fileRead(filePath, 1);
 						  }
 						  rwnd = datagram.getRwnd();
@@ -128,12 +134,14 @@ public class MyClient {
 				if (nextSeqNum - base <= rwnd) {
 					if (map.get(nextSeqNum) != null) {
 						send(map.get(nextSeqNum));
+						System.out.println("发送分组" + map.get(nextSeqNum));
 						nextSeqNum++;
 					}
 				}	
 			}
 		}
 		
+		System.out.println("文件上传完成");
 		
 		//	传输完成, 主动断开连接
 		Datagram disconnect = new Datagram();
