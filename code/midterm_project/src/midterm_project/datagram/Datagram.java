@@ -21,7 +21,7 @@ public class Datagram implements Serializable {
 		port = 8080;
 		filePath = "";
 		buf = new byte[1024 * 32];
-		rwnd = 100;
+		rwnd = 1000;
 	}
 	
 	public int getRwnd() {

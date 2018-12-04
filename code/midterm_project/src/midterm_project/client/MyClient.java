@@ -30,7 +30,7 @@ public class MyClient {
 	private int fileSize = 1024 * 32;
 	private int fileReadNum = 0;
 	private Map<Integer, Datagram> map;
-	private int rwnd = 100;			//	流量控制
+	private int rwnd = 1000;			//	流量控制
 	private int cwnd = 1;			//	拥塞控制当前值
 	private int ssthresh = 8;		//	拥塞控制阈值	
 	private static Lock mapLock  = new ReentrantLock();
@@ -103,12 +103,12 @@ public class MyClient {
 		}).start();
 		
 		//	主线程--传输数据包
-		fileRead(filePath, 100);
+		fileRead(filePath, 1000);
 		
 		//	开启计时器, 每隔0.5s检查是否丢包
         Timer timer = new Timer();  
         long delay = 0;  
-        long intevalPeriod = 1 * 500;  
+        long intevalPeriod = 1 * 100;  
         
         timer.scheduleAtFixedRate(new TimerTask() {  
             @Override  
@@ -212,8 +212,8 @@ public class MyClient {
 				}
 				Datagram resposeDatagram = new Datagram();
 				resposeDatagram.setACK(1);
-				resposeDatagram.setRwnd(100 - map.size());
-				System.out.println("客户端缓冲区窗口空间剩余" + (100-map.size()));
+				resposeDatagram.setRwnd(1000 - map.size());
+				System.out.println("客户端缓冲区窗口空间剩余" + (1000-map.size()));
 				resposeDatagram.setAck(y);
 				resposeDatagram.setPort(fileTranPort);
 				send(resposeDatagram);			

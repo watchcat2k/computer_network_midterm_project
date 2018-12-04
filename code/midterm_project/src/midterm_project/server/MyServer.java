@@ -1,5 +1,6 @@
 package midterm_project.server;
 
+import java.awt.MenuComponent;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
@@ -19,6 +20,7 @@ import java.util.TimerTask;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import javax.swing.text.StyledEditorKit.BoldAction;
 import javax.xml.transform.Templates;
 
 import javafx.scene.chart.PieChart.Data;
@@ -31,16 +33,18 @@ public class MyServer implements Runnable {
 	private int containerSize = 1024 * 64;
 	private int fileSize = 1024 * 32;
 	private int fileReadNum = 0;
+	private int fileWriteNum = 0;
 	private int port;
 	private int x = 0;   //客户端已接收的最小分组序号
 	private int y = 0;   //服务端已接收的最小分组序号
-	private int rwnd = 100;
+	private int rwnd = 1000;
 	private int cwnd = 1;
 	private int ssthresh = 8;
 	private int nextSeqNum = 0;
 	private int base = 0;
 	private int prevBase = base;
 	private int type;    //0代表客户端上传，1代表客户端下载
+	private boolean writeFileFlag = true;    //true代表子线程可以写入文件，否则推出子线程
 	private String filePath; //要上传或下载的文件的路径
 	private String storagePath = "D:/user_chen/network_test/"; //要保存的文件的路径,注意后面要加上文件名
 	private InetAddress clientAddress;
@@ -49,6 +53,7 @@ public class MyServer implements Runnable {
 
 	private static Lock mapLock = new ReentrantLock();
 	private static Lock cwndLock = new ReentrantLock();
+	private static Lock writeFileLock = new ReentrantLock();
 	public static int idlePort = 8081;  //闲置的端口,每次加1
 	
 	public MyServer(int _port) {
@@ -135,6 +140,31 @@ public class MyServer implements Runnable {
 			e.printStackTrace();
 		}
 		
+		new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				// TODO Auto-generated method stub
+				while(true) {
+					try {
+						Thread.sleep(1);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					while(map.get(fileWriteNum) != null) {
+						writeMapToFile(map.get(fileWriteNum).getBuf());
+						map.remove(fileWriteNum);
+						fileWriteNum++;
+						System.out.println("子线程" + port + "分组" + fileWriteNum + "写入文件");
+					}
+					if (writeFileFlag == false) {
+						break;
+					}
+				}			
+			}
+		}).start();
+		
 		while (true) {
 			Datagram requestDatagram = receivePacketAndFormat();
 			System.out.println("子线程 " + port + " 服务器接收到 " + requestDatagram.getSeq() + "号分组 FIN=" +  requestDatagram.getFIN());
@@ -144,23 +174,22 @@ public class MyServer implements Runnable {
 				reposeDatagram.setACK(1);
 				reposeDatagram.setFIN(1);
 				sendPacketAndFormat(reposeDatagram);
-				
+				writeFileFlag = false;
 				server.close();
 				System.out.println("端口为 " + port + " 的服务器已经断开连接");
 				break;
 			}
 			else {
-				map.put(requestDatagram.getSeq(), requestDatagram);
-				while(map.get(y) != null) {
-					writeMapToFile(map.get(y).getBuf());
-					map.remove(y);
+				if (requestDatagram.getSeq() == y && map.size() < 1000) {
+					map.put(requestDatagram.getSeq(), requestDatagram);
 					y++;
 				}
 				
+				
 				Datagram resposeDatagram = new Datagram();
 				resposeDatagram.setACK(1);
-				resposeDatagram.setRwnd(100 - map.size());
-				System.out.println("子线程"+ port + "缓冲区窗口空间剩余" + (100-map.size()));
+				resposeDatagram.setRwnd(1000 - map.size());
+				System.out.println("子线程"+ port + "缓冲区窗口空间剩余" + (1000-map.size()));
 				resposeDatagram.setAck(y);;
 				sendPacketAndFormat(resposeDatagram);			
 			}
@@ -225,7 +254,7 @@ public class MyServer implements Runnable {
 			  }
 			}).start();
 		
-		fileRead(filePath, 100);
+		fileRead(filePath, 1000);
 		
 		//		开启计时器, 每隔0.5s检查是否丢包
         Timer timer = new Timer();  
