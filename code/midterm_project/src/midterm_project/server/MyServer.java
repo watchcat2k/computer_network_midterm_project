@@ -4,14 +4,20 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.security.interfaces.RSAMultiPrimePrivateCrtKey;
 import java.sql.Connection;
 import java.text.Format;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import javax.xml.transform.Templates;
 
@@ -23,15 +29,26 @@ public class MyServer implements Runnable {
 	private DatagramPacket requstPacket = null;
 	private byte[] container;
 	private int containerSize = 1024 * 64;
+	private int fileSize = 1024 * 32;
+	private int fileReadNum = 0;
 	private int port;
 	private int x = 0;   //客户端已接收的最小分组序号
 	private int y = 0;   //服务端已接收的最小分组序号
+	private int rwnd = 100;
+	private int cwnd = 1;
+	private int ssthresh = 8;
+	private int nextSeqNum = 0;
+	private int base = 0;
+	private int prevBase = base;
 	private int type;    //0代表客户端上传，1代表客户端下载
 	private String filePath; //要上传或下载的文件的路径
 	private String storagePath = "D:/user_chen/network_test/"; //要保存的文件的路径,注意后面要加上文件名
 	private InetAddress clientAddress;
 	private int clientPort;
 	private Map<Integer, Datagram> map;
+
+	private static Lock mapLock = new ReentrantLock();
+	private static Lock cwndLock = new ReentrantLock();
 	public static int idlePort = 8081;  //闲置的端口,每次加1
 	
 	public MyServer(int _port) {
@@ -49,6 +66,39 @@ public class MyServer implements Runnable {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+	
+	public void receiveFirstPacketAndNewThread() {
+		//接受第一个	
+		System.out.println("main thread server is wating for data......");
+		Datagram firstDatagram = receivePacketAndFormat();
+		System.out.println("main thread server has received data.");	
+		setType(firstDatagram.getType());
+		setFilePath(firstDatagram.getFilePath());
+		setClientAddress(requstPacket.getAddress());
+		setClientPort(requstPacket.getPort());
+		
+		int subport = createSubThread(); //返回子线程服务器的端口
+		
+		//发送第一个
+		Datagram secondDatagram = new Datagram();
+		secondDatagram.setACK(1);
+		secondDatagram.setPort(subport);
+		sendPacketAndFormat(secondDatagram);		
+		
+	}
+	
+	private int createSubThread() {
+		//创建线程
+		int subport = avaliblePort();
+		MyServer subServer = new MyServer(subport);
+		subServer.setType(type);
+		subServer.setFilePath(filePath);
+		subServer.setClientAddress(clientAddress);
+		subServer.setClientPort(clientPort);
+		Thread subThread = new Thread(subServer, subport + "");
+		subThread.start();
+		return subport;
 	}
 	
 	@Override
@@ -138,6 +188,90 @@ public class MyServer implements Runnable {
 	}
 	
 	public void clientDowload() {
+		//		子线程--接收响应
+			new Thread(new Runnable() {
+			  @Override
+			  public void run() {
+				  while (true) {
+					  Datagram datagram = receivePacketAndFormat();
+					  if (datagram.getACK() == 1) {					  
+						  if (datagram.getFIN() == 1) {
+							  System.out.println("客户端" + clientPort + "已断开连接");
+							  break;
+						  } else {
+							  for (int i = base; i < datagram.getAck(); i++) {
+								  mapLock.lock();
+								  map.remove(i);  
+								  mapLock.unlock();
+								  System.out.println("子线程" + port + "分组" + i + "被成功接收");
+								  cwndLock.lock();
+								  if (cwnd < ssthresh) {
+									  cwnd *= 2;
+									  System.out.println("子线程" + port + "拥塞控制处于慢启动阶段, cwnd = " + cwnd + ", 阈值ssthresh = " + ssthresh);
+								  }
+								  else {
+									  cwnd++;
+									  System.out.println("子线程" + port + "拥塞控制处于拥塞避免阶段, cwnd = " + cwnd + ", 阈值ssthresh = " + ssthresh);
+								  }
+								  cwndLock.unlock();
+								  base++;
+								  fileRead(filePath, 1);
+							  }
+							  rwnd = datagram.getRwnd();
+							  System.out.println("子线程" + port + "服务器空闲缓冲区大小为" + rwnd + ", 已发送分组数量为" + (nextSeqNum - base));
+						  }
+					  }
+				  }
+			  }
+			}).start();
+		
+		fileRead(filePath, 100);
+		
+		//		开启计时器, 每隔0.5s检查是否丢包
+        Timer timer = new Timer();  
+        long delay = 0;  
+        long intevalPeriod = 1 * 100;  
+        
+        timer.scheduleAtFixedRate(new TimerTask() {  
+            @Override  
+            public void run() {  
+            	if (base == prevBase) {
+            		System.out.println("分组" + base + "丢失");
+            		nextSeqNum = base;
+            		cwndLock.lock();
+            		ssthresh = cwnd / 2;
+            		cwnd = 1;
+            		cwndLock.unlock();
+            		System.out.println("子线程" + port + "拥塞控制处于快速恢复阶段, cwnd = " + cwnd + ", 阈值ssthresh = " + ssthresh);
+            	} else {
+            		prevBase = base;
+            	}
+            }  
+        }, delay, intevalPeriod);
+		
+		while (true) {
+			mapLock.lock();
+			if (map.isEmpty()) {
+				mapLock.unlock();
+				break;
+			}
+			mapLock.unlock();
+			
+			for (int i = 0; i < cwnd; i++) {
+				if (nextSeqNum - base <= rwnd) {
+					if (map.get(nextSeqNum) != null) {
+						sendPacketAndFormat(map.get(nextSeqNum));
+						System.out.println("子线程" + port + "发送分组" + nextSeqNum);
+						nextSeqNum++;
+						System.out.println("子线程" + port + "客户端空闲缓冲区大小为" + rwnd + ", 已发送分组数量为" + (nextSeqNum - base));
+					}
+				}	
+			}
+		}
+		
+		System.out.println("文件下载完成");
+		
+		
 		//主动发送结束连接fin = 1
 		Datagram reposeDatagram = new Datagram();
 		reposeDatagram.setFIN(1);
@@ -150,6 +284,7 @@ public class MyServer implements Runnable {
 			System.out.println("端口为 " + port + " 的服务器已经断开连接");
 		}
 			
+		timer.cancel();
 	}
 	
 	public int avaliblePort() {
@@ -158,37 +293,30 @@ public class MyServer implements Runnable {
 		return tempPort;
 	}
 	
-	public void receiveFirstPacketAndNewThread() {
-		//接受第一个	
-		System.out.println("main thread server is wating for data......");
-		Datagram firstDatagram = receivePacketAndFormat();
-		System.out.println("main thread server has received data.");	
-		setType(firstDatagram.getType());
-		setFilePath(firstDatagram.getFilePath());
-		setClientAddress(requstPacket.getAddress());
-		setClientPort(requstPacket.getPort());
-		
-		int subport = createSubThread(); //返回子线程服务器的端口
-		
-		//发送第一个
-		Datagram secondDatagram = new Datagram();
-		secondDatagram.setACK(1);
-		secondDatagram.setPort(subport);
-		sendPacketAndFormat(secondDatagram);		
-		
-	}
-	
-	private int createSubThread() {
-		//创建线程
-		int subport = avaliblePort();
-		MyServer subServer = new MyServer(subport);
-		subServer.setType(type);
-		subServer.setFilePath(filePath);
-		subServer.setClientAddress(clientAddress);
-		subServer.setClientPort(clientPort);
-		Thread subThread = new Thread(subServer, subport + "");
-		subThread.start();
-		return subport;
+	//	从文件中读取数据流
+	private void fileRead(String FilePath, int num) {		//	num表示读取块数
+		File src = new File(FilePath);
+		RandomAccessFile rFile;
+		try {
+			rFile = new RandomAccessFile(src, "r");
+			rFile.seek(fileReadNum * fileSize);
+			for (int i = 0; i < num; i++) {
+				Datagram datagram = new Datagram();
+				byte[] buf = new byte[fileSize];
+				if (rFile.read(buf) == -1) {
+					break;
+				}
+				datagram.setPort(clientPort);
+				datagram.setBuf(buf);
+				datagram.setSeq(fileReadNum);
+				mapLock.lock();
+				map.put(fileReadNum, datagram);
+				mapLock.unlock();
+				fileReadNum++;
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 	
 	private Datagram receivePacketAndFormat() {
