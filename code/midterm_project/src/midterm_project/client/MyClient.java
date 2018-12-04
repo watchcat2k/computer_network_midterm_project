@@ -113,6 +113,7 @@ public class MyClient {
 							  fileRead(filePath, 1);
 						  }
 						  rwnd = datagram.getRwnd();
+						  System.out.println("服务器空闲缓冲区大小为" + rwnd + ", 已发送分组数量为" + (nextSeqNum - base));
 					  }
 				  }
 			  }
@@ -134,8 +135,9 @@ public class MyClient {
 				if (nextSeqNum - base <= rwnd) {
 					if (map.get(nextSeqNum) != null) {
 						send(map.get(nextSeqNum));
-						System.out.println("发送分组" + map.get(nextSeqNum));
+						System.out.println("发送分组" + nextSeqNum);
 						nextSeqNum++;
+						System.out.println("服务器空闲缓冲区大小为" + rwnd + ", 已发送分组数量为" + (nextSeqNum - base));
 					}
 				}	
 			}
@@ -148,6 +150,8 @@ public class MyClient {
 		disconnect.setFIN(1);
 		disconnect.setPort(fileTranPort);
 		send(disconnect);
+		//	终止定时器
+		timer.cancel(); 
 	}
 	
 	public void Download(String filePath) {
@@ -168,6 +172,17 @@ public class MyClient {
 		disconnect.setACK(1);
 		disconnect.setPort(fileTranPort);
 		send(disconnect);
+	}
+	
+	//	下载文件
+	private void receiveFile() {
+		while (true) {
+			Datagram response = receive();
+			if (response.getFIN() == 1) {
+				System.out.println("客户端" + sourcePort + "已断开连接");
+				break;
+			}
+		}
 	}
 	
 	
@@ -196,18 +211,8 @@ public class MyClient {
 		return null;
 	}
 	
-	//	下载文件
-	private void receiveFile() {
-		while (true) {
-			Datagram response = receive();
-			if (response.getFIN() == 1) {
-				System.out.println("客户端" + sourcePort + "已断开连接");
-				break;
-			}
-		}
-	}
-	
-	private void fileRead(String FilePath, int num) {		//	num表示读取数
+	//	从文件中读取数据流
+	private void fileRead(String FilePath, int num) {		//	num表示读取块数
 		File src = new File(FilePath);
 		RandomAccessFile rFile;
 		try {
