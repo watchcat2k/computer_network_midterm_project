@@ -4,6 +4,8 @@ import java.util.Scanner;
 
 public class ClientMain {
 	public static void main(String[] args) {
+		//服务器地址为47.107.245.11
+		//本地地址为localhost
 		MyClient myClient = new MyClient(8888, "localhost");
 		
 		System.out.println("请输入要上传或下载的文件");
