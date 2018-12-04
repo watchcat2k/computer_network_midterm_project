@@ -73,7 +73,7 @@ public class MyClient {
 				  if (datagram.getACK() == 1) {					  
 					  if (datagram.getFIN() == 1) {
 						  System.out.println("客户端" + sourcePort + "已断开连接");
-						  client.close();
+						  //client.close();
 						  break;
 					  } else {
 						  for (int i = base; i < datagram.getAck(); i++) {
@@ -199,7 +199,7 @@ public class MyClient {
 				reposeDatagram.setPort(fileTranPort);
 				send(reposeDatagram);
 				
-				client.close();
+				//client.close();
 				System.out.println("客户端" + sourcePort + "已经断开连接");
 				break;
 			}
