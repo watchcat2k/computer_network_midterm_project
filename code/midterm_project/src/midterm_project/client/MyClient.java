@@ -113,7 +113,7 @@ public class MyClient {
 							  fileRead(filePath, 1);
 						  }
 						  rwnd = datagram.getRwnd();
-						  System.out.println("服务器空闲缓冲区大小为" + rwnd + ", 已发送分组数量为" + nextSeqNum - base);
+						  System.out.println("服务器空闲缓冲区大小为" + rwnd + ", 已发送分组数量为" + (nextSeqNum - base));
 					  }
 				  }
 			  }
@@ -137,6 +137,7 @@ public class MyClient {
 						send(map.get(nextSeqNum));
 						System.out.println("发送分组" + nextSeqNum);
 						nextSeqNum++;
+						System.out.println("服务器空闲缓冲区大小为" + rwnd + ", 已发送分组数量为" + (nextSeqNum - base));
 					}
 				}	
 			}
