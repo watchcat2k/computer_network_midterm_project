@@ -1,6 +1,8 @@
 package midterm_project.client;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -21,7 +23,7 @@ public class MyClient {
 	private String destinationIp;
 	private DatagramSocket client;
 	private int base = 0;			//	最小未接收到的分组号
-	private int prevBase = base;	//	1s前的base
+	private int prevBase = base;	//	0.5s前的base
 	private int nextSeqNum = 0;		//	最小未发送的分组号
 	private int fileTranPort;
 	private int packetSize = 1024 * 64;
@@ -33,6 +35,8 @@ public class MyClient {
 	private int ssthresh = 8;		//	拥塞控制阈值	
 	private static Lock mapLock  = new ReentrantLock();
 	private static Lock cwndLock = new ReentrantLock();
+	private String storagePath = "D:/user_chen/network_test/";
+	private int y = 0;
 	
 	public MyClient(int sourcePort, String destinationIp) {
 		this.sourcePort = sourcePort;
@@ -60,29 +64,6 @@ public class MyClient {
 			System.out.println("获取的端口号为" + fileTranPort);
 		}
 		
-		
-		//	开启计时器, 每隔0.5s检查是否丢包
-        Timer timer = new Timer();  
-        long delay = 0;  
-        long intevalPeriod = 1 * 500;  
-        
-        timer.scheduleAtFixedRate(new TimerTask() {  
-            @Override  
-            public void run() {  
-            	if (base == prevBase) {
-            		System.out.println("分组" + base + "丢失");
-            		nextSeqNum = base;
-            		cwndLock.lock();
-            		ssthresh = cwnd / 2;
-            		cwnd = 1;
-            		cwndLock.unlock();
-            		System.out.println("拥塞控制处于快速恢复阶段, cwnd = " + cwnd + ", 阈值ssthresh = " + ssthresh);
-            	} else {
-            		prevBase = base;
-            	}
-            }  
-        }, delay, intevalPeriod);
-		
 		//	子线程--接收响应
 		new Thread(new Runnable() {
 		  @Override
@@ -92,6 +73,7 @@ public class MyClient {
 				  if (datagram.getACK() == 1) {					  
 					  if (datagram.getFIN() == 1) {
 						  System.out.println("客户端" + sourcePort + "已断开连接");
+						  client.close();
 						  break;
 					  } else {
 						  for (int i = base; i < datagram.getAck(); i++) {
@@ -122,6 +104,28 @@ public class MyClient {
 		
 		//	主线程--传输数据包
 		fileRead(filePath, 100);
+		
+		//	开启计时器, 每隔0.5s检查是否丢包
+        Timer timer = new Timer();  
+        long delay = 0;  
+        long intevalPeriod = 1 * 500;  
+        
+        timer.scheduleAtFixedRate(new TimerTask() {  
+            @Override  
+            public void run() {  
+            	if (base == prevBase) {
+            		System.out.println("分组" + base + "丢失");
+            		nextSeqNum = base;
+            		cwndLock.lock();
+            		ssthresh = cwnd / 2;
+            		cwnd = 1;
+            		cwndLock.unlock();
+            		System.out.println("拥塞控制处于快速恢复阶段, cwnd = " + cwnd + ", 阈值ssthresh = " + ssthresh);
+            	} else {
+            		prevBase = base;
+            	}
+            }  
+        }, delay, intevalPeriod);
 		
 		while (true) {
 			mapLock.lock();
@@ -160,29 +164,68 @@ public class MyClient {
 		download.setType(1);
 		download.setFilePath(filePath);
 		send(download);
-		Datagram response = receive();
-		if (response.getACK() == 1) {
-			fileTranPort = response.getPort();
+		Datagram downloadResponse = receive();
+		if (downloadResponse.getACK() == 1) {
+			fileTranPort = downloadResponse.getPort();
 		}
 		
-		receiveFile();
+		//如果文件已存在，先删除，后再接受上传的文件
+		String[] fileDecode = filePath.split("/");
+		String fileName = fileDecode[fileDecode.length - 1];
+		String storageFilePath = storagePath + fileName ;
+		File file = new File(storageFilePath);
+		try {
+			if (!file.exists()) {
+				file.createNewFile();
+			}
+			else {
+				file.delete();
+				file.createNewFile();
+			}
+		}
+		catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		//	下载文件
+		while (true) {
+			Datagram requestDatagram = receive();
+			System.out.println("客户端接收到 " + requestDatagram.getSeq() + "号分组 FIN=" +  requestDatagram.getFIN());
+			////接受到fin = 1,结束连接，发送对方ACK=1
+			if (requestDatagram.getFIN() == 1) {
+				Datagram reposeDatagram = new Datagram();
+				reposeDatagram.setACK(1);
+				reposeDatagram.setFIN(1);
+				send(reposeDatagram);
+				
+				client.close();
+				System.out.println("客户端" + sourcePort + "已经断开连接");
+				break;
+			}
+			else {
+				map.put(requestDatagram.getSeq(), requestDatagram);
+				while(map.get(y) != null) {
+					writeMapToFile(map.get(y).getBuf(), filePath);
+					map.remove(y);
+					y++;
+				}
+				
+				Datagram resposeDatagram = new Datagram();
+				resposeDatagram.setACK(1);
+				resposeDatagram.setRwnd(100 - map.size());
+				System.out.println("客户端缓冲区窗口空间剩余" + (100-map.size()));
+				resposeDatagram.setAck(y);;
+				send(resposeDatagram);			
+			}
+				
+			
+		}
 		
 		//	断开连接
 		Datagram disconnect = new Datagram();
 		disconnect.setACK(1);
 		disconnect.setPort(fileTranPort);
 		send(disconnect);
-	}
-	
-	//	下载文件
-	private void receiveFile() {
-		while (true) {
-			Datagram response = receive();
-			if (response.getFIN() == 1) {
-				System.out.println("客户端" + sourcePort + "已断开连接");
-				break;
-			}
-		}
 	}
 	
 	
@@ -233,6 +276,20 @@ public class MyClient {
 				fileReadNum++;
 			}
 		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void writeMapToFile(byte[] data, String filePath) {
+		try {
+			String[] fileDecode = filePath.split("/");
+			String fileName = fileDecode[fileDecode.length - 1];
+			String storageFilePath = storagePath + fileName ;
+			File file = new File(storageFilePath);
+			FileOutputStream oStream = new FileOutputStream(file, true);
+			oStream.write(data, 0, data.length);
+			oStream.close();
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
