@@ -113,6 +113,7 @@ public class MyClient {
 							  fileRead(filePath, 1);
 						  }
 						  rwnd = datagram.getRwnd();
+						  System.out.println("服务器空闲缓冲区大小为" + rwnd + ", 已发送分组数量为" + nextSeqNum - base);
 					  }
 				  }
 			  }
@@ -148,6 +149,8 @@ public class MyClient {
 		disconnect.setFIN(1);
 		disconnect.setPort(fileTranPort);
 		send(disconnect);
+		//	终止定时器
+		timer.cancel(); 
 	}
 	
 	public void Download(String filePath) {
