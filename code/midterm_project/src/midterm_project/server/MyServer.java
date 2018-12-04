@@ -247,7 +247,6 @@ public class MyServer implements Runnable {
 								  fileRead(filePath, 1);
 							  }
 							  rwnd = datagram.getRwnd();
-							  System.out.println("子线程" + port + "服务器空闲缓冲区大小为" + rwnd + ", 已发送分组数量为" + (nextSeqNum - base));
 						  }
 					  }
 				  }
@@ -287,12 +286,12 @@ public class MyServer implements Runnable {
 			mapLock.unlock();
 			
 			for (int i = 0; i < cwnd; i++) {
-				if (nextSeqNum - base <= rwnd) {
+				if (nextSeqNum - base < rwnd) {
 					if (map.get(nextSeqNum) != null) {
 						sendPacketAndFormat(map.get(nextSeqNum));
 						System.out.println("子线程" + port + "发送分组" + nextSeqNum);
-						nextSeqNum++;
 						System.out.println("子线程" + port + "客户端空闲缓冲区大小为" + rwnd + ", 已发送分组数量为" + (nextSeqNum - base));
+						nextSeqNum++;
 					}
 				}	
 			}

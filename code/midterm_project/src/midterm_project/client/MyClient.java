@@ -29,6 +29,8 @@ public class MyClient {
 	private int packetSize = 1024 * 64;
 	private int fileSize = 1024 * 32;
 	private int fileReadNum = 0;
+	private int fileWriteNum = 0;
+	private boolean writeFileFlag = true;    //true代表子线程可以写入文件，否则推出子线程
 	private Map<Integer, Datagram> map;
 	private int rwnd = 1000;			//	流量控制
 	private int cwnd = 1;			//	拥塞控制当前值
@@ -73,7 +75,6 @@ public class MyClient {
 				  if (datagram.getACK() == 1) {					  
 					  if (datagram.getFIN() == 1) {
 						  System.out.println("客户端" + sourcePort + "已断开连接");
-						  //client.close();
 						  break;
 					  } else {
 						  for (int i = base; i < datagram.getAck(); i++) {
@@ -136,12 +137,12 @@ public class MyClient {
 			mapLock.unlock();
 			
 			for (int i = 0; i < cwnd; i++) {
-				if (nextSeqNum - base <= rwnd) {
+				if (nextSeqNum - base < rwnd) {
 					if (map.get(nextSeqNum) != null) {
 						send(map.get(nextSeqNum));
 						System.out.println("发送分组" + nextSeqNum);
-						nextSeqNum++;
 						System.out.println("服务器空闲缓冲区大小为" + rwnd + ", 已发送分组数量为" + (nextSeqNum - base));
+						nextSeqNum++;
 					}
 				}	
 			}
@@ -187,6 +188,32 @@ public class MyClient {
 			e.printStackTrace();
 		}
 		
+		
+		new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				// TODO Auto-generated method stub
+				while(true) {
+					try {
+						Thread.sleep(1);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					while(map.get(fileWriteNum) != null) {
+						writeMapToFile(map.get(fileWriteNum).getBuf(), filePath);
+						map.remove(fileWriteNum);
+						fileWriteNum++;
+						System.out.println("分组" + fileWriteNum + "写入文件");
+					}
+					if (writeFileFlag == false) {
+						break;
+					}
+				}			
+			}
+		}).start();
+		
 		//	下载文件
 		while (true) {
 			Datagram requestDatagram = receive();
@@ -198,18 +225,17 @@ public class MyClient {
 				reposeDatagram.setFIN(1);
 				reposeDatagram.setPort(fileTranPort);
 				send(reposeDatagram);
+				writeFileFlag = false;
 				
-				//client.close();
 				System.out.println("客户端" + sourcePort + "已经断开连接");
 				break;
 			}
 			else {
-				map.put(requestDatagram.getSeq(), requestDatagram);
-				while(map.get(y) != null) {
-					writeMapToFile(map.get(y).getBuf(), filePath);
-					map.remove(y);
+				if (requestDatagram.getSeq() == y && map.size() < 1000) {
+					map.put(requestDatagram.getSeq(), requestDatagram);
 					y++;
 				}
+				
 				Datagram resposeDatagram = new Datagram();
 				resposeDatagram.setACK(1);
 				resposeDatagram.setRwnd(1000 - map.size());
