@@ -196,6 +196,7 @@ public class MyClient {
 				Datagram reposeDatagram = new Datagram();
 				reposeDatagram.setACK(1);
 				reposeDatagram.setFIN(1);
+				reposeDatagram.setPort(fileTranPort);
 				send(reposeDatagram);
 				
 				client.close();
@@ -209,16 +210,14 @@ public class MyClient {
 					map.remove(y);
 					y++;
 				}
-				
 				Datagram resposeDatagram = new Datagram();
 				resposeDatagram.setACK(1);
 				resposeDatagram.setRwnd(100 - map.size());
 				System.out.println("客户端缓冲区窗口空间剩余" + (100-map.size()));
-				resposeDatagram.setAck(y);;
+				resposeDatagram.setAck(y);
+				resposeDatagram.setPort(fileTranPort);
 				send(resposeDatagram);			
 			}
-				
-			
 		}
 		
 		//	断开连接
