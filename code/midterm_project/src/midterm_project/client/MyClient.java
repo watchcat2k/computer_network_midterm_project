@@ -134,7 +134,7 @@ public class MyClient {
 				if (nextSeqNum - base <= rwnd) {
 					if (map.get(nextSeqNum) != null) {
 						send(map.get(nextSeqNum));
-						System.out.println("发送分组" + map.get(nextSeqNum));
+						System.out.println("发送分组" + nextSeqNum);
 						nextSeqNum++;
 					}
 				}	
@@ -170,6 +170,17 @@ public class MyClient {
 		send(disconnect);
 	}
 	
+	//	下载文件
+	private void receiveFile() {
+		while (true) {
+			Datagram response = receive();
+			if (response.getFIN() == 1) {
+				System.out.println("客户端" + sourcePort + "已断开连接");
+				break;
+			}
+		}
+	}
+	
 	
 	//	发送数据包
 	private void send(Datagram upload) {
@@ -196,18 +207,8 @@ public class MyClient {
 		return null;
 	}
 	
-	//	下载文件
-	private void receiveFile() {
-		while (true) {
-			Datagram response = receive();
-			if (response.getFIN() == 1) {
-				System.out.println("客户端" + sourcePort + "已断开连接");
-				break;
-			}
-		}
-	}
-	
-	private void fileRead(String FilePath, int num) {		//	num表示读取数
+	//	从文件中读取数据流
+	private void fileRead(String FilePath, int num) {		//	num表示读取块数
 		File src = new File(FilePath);
 		RandomAccessFile rFile;
 		try {
